@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>社内SE謹製・バーコード生成ツール Ver.2.2</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.3.0/dist/exceljs.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h2 { border-left: 5px solid #2c3e50; padding-left: 15px; color: #2c3e50; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        button { background-color: #2c3e50; color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; transition: 0.3s; }
+        button:hover { background-color: #34495e; opacity: 0.9; }
+        button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        #result-area { text-align: center; margin-top: 30px; padding: 20px; border: 2px dashed #bdc3c7; min-height: 150px; background: #fafafa; }
+        #barcodeImg { max-width: 100%; height: auto; cursor: pointer; display: none; margin: 0 auto; }
+        .hint { font-size: 0.85em; color: #666; margin-top: 15px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>バーコード生成（Excel出力版）</h2>
+    
+    <div class="input-group">
+        <label>① バーコードにする文字</label>
+        <input type="text" id="barcodeValue" placeholder="ここに入力してください（例：112000000）" value="">
+    </div>
+
+    <div class="input-group">
+        <label>② 規格の選択</label>
+        <select id="format">
+            <option value="CODE128">CODE128 (推奨)</option>
+            <option value="CODE39">CODE39 (一般的)</option>
+        </select>
+    </div>
+
+    <div class="btn-group">
+        <button onclick="generateBarcode()">③ バーコードを作成</button>
+        <button id="downloadBtn" onclick="exportToExcel()" disabled>④ Excelで出力する</button>
+    </div>
+
+    <div id="result-area">
+        <p id="placeholderText">ここにバーコードが表示されます</p>
+        <canvas id="barcodeCanvas" style="display:none;"></canvas>
+        <img id="barcodeImg" alt="バーコード画像">
+    </div>
+
+    <div class="hint">
+        ・バーコード作成後、<b>画像の上で右クリック</b>して「画像をコピー」が可能です。<br>
+        ・「Excelで出力する」を押すと、<b>B2セルに貼り付いた状態</b>でダウンロードされます。
+    </div>
+</div>
+
+<script>
+    function generateBarcode() {
+        const val = document.getElementById('barcodeValue').value;
+        const fmt = document.getElementById('format').value;
+        const canvas = document.getElementById('barcodeCanvas');
+        const img = document.getElementById('barcodeImg');
+        const placeholder = document.getElementById('placeholderText');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        if(!val) {
+            alert("恐れ入ります、文字を入力してくださいませ。");
+            return;
+        }
+
+        try {
+            JsBarcode(canvas, val, {
+                format: fmt,
+                lineColor: "#000",
+                width: 2,
+                height: 80,
+                displayValue: true,
+                background: "#ffffff"
+            });
+
+            img.src = canvas.toDataURL("image/png");
+            img.style.display = 'block';
+            placeholder.style.display = 'none';
+            downloadBtn.disabled = false;
+
+        } catch (e) {
+            alert("エラーが発生しました。入力内容や規格に間違いがないかご確認ください。");
+        }
+    }
+
+    async function exportToExcel() {
+        const val = document.getElementById('barcodeValue').value;
+        const imgData = document.getElementById('barcodeImg').src;
+        
+        if(!imgData) return;
+
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('バーコード');
+
+        const imageId = workbook.addImage({
+            base64: imgData,
+            extension: 'png',
+        });
+
+        worksheet.addImage(imageId, {
+            tl: { col: 1, row: 1 },
+            ext: { width: 280, height: 90 }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `バーコード_${val}.xlsx`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+    }
+</script>
+
+</body>
+</html>
